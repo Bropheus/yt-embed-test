@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>驗證頁（允許清單版）</title>
+<style>
+  :root { --bg:#f6f5f2; --fg:#1d1d1f; --muted:#6b6b70; --card:#fff; --line:#ddd; --ok:#1a7f37; --bad:#c62828; --acc:#1f5fbf; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:16px/1.55 -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 0 0 8px; }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: .92rem; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+  .frame { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
+  .frame iframe, .frame > div { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  button { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--acc); background: var(--acc); color: #fff; }
+  button.ghost { background: transparent; color: var(--acc); }
+  input[type=text], input[type=number] { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+  input[type=text] { flex: 1 1 220px; }
+  input[type=number] { width: 5.5em; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .85rem; background: #eee; }
+  .badge.ok { background: #e3f4e8; color: var(--ok); }
+  .badge.bad { background: #fde8e8; color: var(--bad); }
+  #log { font: 13px/1.45 ui-monospace, Menlo, monospace; background: #111; color: #d7f5d7; border-radius: 8px; padding: 10px; height: 220px; overflow: auto; white-space: pre-wrap; }
+  .big { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  ol { padding-left: 1.3em; margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>驗證頁（允許清單版，無 youtube.com 嵌入）</h1>
+  <p class="muted">一頁驗三件事：①「僅限允許的網站」下嵌入能不能播 ②AirPlay 中移除播放器，電視會不會停 ③片尾推薦能不能避開。所有結果記在最下方紀錄，可一鍵複製回報。</p>
+
+  <section>
+    <h2>影片</h2>
+    <div class="row">
+      <input id="vid" type="text" value="M7lc1UVf-VE" aria-label="影片 ID 或網址">
+      <button id="applyVid">套用</button>
+    </div>
+    <p class="muted">可貼 YouTube 網址或 11 碼 ID。預設是 YouTube 官方 API 示範影片；也可換成 Numberblocks 的某一集。</p>
+  </section>
+
+  <section>
+    <h2>測試 1A：純 iframe（youtube-nocookie.com）</h2>
+    <div class="frame"><iframe id="f1a" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+    <p class="muted">能看到封面、按下去會播 → 記「1A 可播」。</p>
+  </section>
+
+  <section>
+    <h2>測試 1C＋2＋3：可程式控制的播放器（IFrame API）</h2>
+    <p>API 載入：<span id="apiBadge" class="badge">等待中</span>　播放器：<span id="readyBadge" class="badge">未建立</span></p>
+    <div class="row">
+      <label><input type="radio" name="host" value="nocookie" checked> youtube-nocookie.com</label>
+      <button id="build" class="ghost">建立／重建播放器</button>
+    </div>
+    <div class="frame" id="apiFrame"><div id="player"></div></div>
+
+    <h2 style="margin-top:14px">測試 2：到點停止（AirPlay 用）</h2>
+    <ol class="muted">
+      <li>先按播放，再用播放器全螢幕的 AirPlay 按鈕（或控制中心「螢幕鏡像輸出」）投到 Apple TV。</li>
+      <li>按「開始倒數」。到 0 時先暫停，2 秒後把播放器整個移除。</li>
+      <li>看電視：畫面有沒有停？有沒有自己又繼續播？</li>
+    </ol>
+    <div class="row">
+      <input id="secs" type="number" min="5" value="30"> 秒
+      <button id="countdown">開始倒數</button>
+      <span class="big" id="clock">—</span>
+    </div>
+    <div class="row">
+      <button id="pauseNow" class="ghost">立即暫停</button>
+      <button id="destroyNow" class="ghost">立即移除播放器</button>
+    </div>
+
+    <h2 style="margin-top:14px">測試 3：片尾推薦</h2>
+    <div class="row">
+      <button id="seekEnd" class="ghost">跳到片尾前 20 秒</button>
+      <label><input id="autoCut" type="checkbox"> 片尾前</label>
+      <input id="cutSecs" type="number" min="1" value="15"> 秒自動移除
+    </div>
+    <p class="muted">另測：片尾出現推薦時<b>點一支推薦影片</b>，記下是被擋、當掉、還是在框內播放。不勾選：播到最後，看片尾有沒有出現其他影片封面（記下是同頻道還是別的頻道）。勾選：確認在推薦出現前就被移除。</p>
+  </section>
+
+  <section>
+    <h2>紀錄</h2>
+    <div id="log"></div>
+    <div class="row">
+      <button id="copy">複製紀錄</button>
+      <button id="note" class="ghost">加一行備註</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var logEl = document.getElementById('log');
+  function log(msg) {
+    var t = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+    logEl.textContent += '[' + t + '] ' + msg + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  window.__log = log;
+  log('頁面載入；UA=' + navigator.userAgent);
+
+  function parseId(s) {
+    s = (s || '').trim();
+    var m = s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+    if (m) return m[1];
+    return /^[A-Za-z0-9_-]{11}$/.test(s) ? s : null;
+  }
+  var videoId = 'M7lc1UVf-VE';
+
+  function setPlainFrames() {
+    var q = '?rel=0&playsinline=1';
+    var a = document.getElementById('f1a');
+    a.src = 'https://www.youtube-nocookie.com/embed/' + videoId + q;
+    a.onload = function () { log('1A iframe onload（不代表能播，要看畫面）'); };
+  }
+
+  document.getElementById('applyVid').onclick = function () {
+    var id = parseId(document.getElementById('vid').value);
+    if (!id) { log('影片 ID 無法解析'); return; }
+    videoId = id; log('套用影片 ' + id);
+    setPlainFrames(); buildPlayer();
+  };
+  setPlainFrames();
+
+  // ---- IFrame API ----
+  var player = null, apiReady = false, cutTimer = null, cdTimer = null;
+  var apiBadge = document.getElementById('apiBadge'), readyBadge = document.getElementById('readyBadge');
+  var STATES = { '-1': '未開始', 0: '結束', 1: '播放中', 2: '暫停', 3: '緩衝', 5: '已載入' };
+
+  function badge(el, text, cls) { el.textContent = text; el.className = 'badge ' + (cls || ''); }
+
+  var s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  s.onerror = function () { badge(apiBadge, '載入失敗', 'bad'); log('1C：iframe_api 腳本載入失敗（可能被網站過濾擋下）'); };
+  document.head.appendChild(s);
+  setTimeout(function () { if (!apiReady) log('1C：10 秒內 API 仍未就緒'); }, 10000);
+
+  window.onYouTubeIframeAPIReady = function () {
+    apiReady = true; badge(apiBadge, '已載入', 'ok'); log('1C：IFrame API 就緒');
+    buildPlayer();
+  };
+
+  function host() {
+    return document.querySelector('input[name=host]:checked').value === 'www'
+      ? 'https://www.youtube.com' : 'https://www.youtube-nocookie.com';
+  }
+
+  function destroyPlayer(reason) {
+    if (cutTimer) { clearInterval(cutTimer); cutTimer = null; }
+    if (player) {
+      try { player.destroy(); } catch (e) { log('destroy 例外：' + e.message); }
+      player = null;
+    }
+    var f = document.getElementById('apiFrame');
+    f.innerHTML = '<div id="player"></div>';
+    badge(readyBadge, '已移除', '');
+    log('播放器已移除（' + reason + '）');
+  }
+
+  function buildPlayer() {
+    if (!apiReady) { log('API 尚未就緒，無法建立'); return; }
+    destroyPlayer('重建');
+    badge(readyBadge, '建立中', '');
+    player = new YT.Player('player', {
+      host: host(),
+      videoId: videoId,
+      playerVars: { rel: 0, playsinline: 1, modestbranding: 1 },
+      events: {
+        onReady: function () { badge(readyBadge, '就緒', 'ok'); log('1C：播放器就緒 host=' + host()); startCutWatch(); },
+        onStateChange: function (e) { log('狀態：' + (STATES[e.data] || e.data)); },
+        onError: function (e) { badge(readyBadge, '錯誤 ' + e.data, 'bad'); log('播放器錯誤碼 ' + e.data + '（101/150＝不允許嵌入）'); }
+      }
+    });
+  }
+  document.getElementById('build').onclick = buildPlayer;
+
+  function startCutWatch() {
+    if (cutTimer) clearInterval(cutTimer);
+    cutTimer = setInterval(function () {
+      if (!player || !document.getElementById('autoCut').checked || !player.getDuration) return;
+      var d = player.getDuration(), c = player.getCurrentTime();
+      var n = Number(document.getElementById('cutSecs').value) || 15;
+      if (d > 0 && d - c <= n) {
+        log('片尾前 ' + n + ' 秒，自動移除（位置 ' + c.toFixed(1) + '／' + d.toFixed(1) + '）');
+        destroyPlayer('片尾自動切走');
+      }
+    }, 500);
+  }
+
+  document.getElementById('seekEnd').onclick = function () {
+    if (!player || !player.getDuration) { log('播放器未就緒'); return; }
+    var d = player.getDuration();
+    player.seekTo(Math.max(0, d - 20), true); player.playVideo();
+    log('跳到片尾前 20 秒（總長 ' + d.toFixed(1) + '）');
+  };
+
+  document.getElementById('pauseNow').onclick = function () {
+    if (player && player.pauseVideo) { player.pauseVideo(); log('手動暫停'); } else log('沒有播放器可暫停');
+  };
+  document.getElementById('destroyNow').onclick = function () { destroyPlayer('手動'); };
+
+  document.getElementById('countdown').onclick = function () {
+    if (cdTimer) clearInterval(cdTimer);
+    var left = Number(document.getElementById('secs').value) || 30;
+    var clock = document.getElementById('clock');
+    clock.textContent = left; log('倒數開始：' + left + ' 秒');
+    cdTimer = setInterval(function () {
+      left -= 1; clock.textContent = left;
+      if (left <= 0) {
+        clearInterval(cdTimer); cdTimer = null; clock.textContent = '0';
+        if (player && player.pauseVideo) { player.pauseVideo(); log('倒數到 0：已暫停'); }
+        setTimeout(function () { destroyPlayer('倒數到點'); }, 2000);
+      }
+    }, 1000);
+  };
+
+  document.getElementById('note').onclick = function () {
+    var t = prompt('備註（例如：電視畫面停了／沒停、片尾出現別頻道封面）');
+    if (t) log('備註：' + t);
+  };
+  document.getElementById('copy').onclick = function () {
+    var text = logEl.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { log('已複製紀錄'); }, function () { log('複製失敗，請長按紀錄區手動複製'); });
+    } else log('此瀏覽器不支援一鍵複製，請長按紀錄區手動複製');
+  };
+})();
+</script>
+</body>
+</html>
